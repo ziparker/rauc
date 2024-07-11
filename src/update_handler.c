@@ -1296,7 +1296,10 @@ static gboolean untar_image(RaucImage *image, gchar *dest, GError **error)
 	g_ptr_array_add(args, g_strdup("--numeric-owner"));
 	g_ptr_array_add(args, g_strdup(suffix_to_tar_flag(image->filename)));
 	if (have_xattr)
-		g_ptr_array_add(args, g_strdup("--xattrs"));
+	{
+		g_ptr_array_add(args, g_strdup("--xattrs-include='*'"));
+		g_ptr_array_add(args, g_strdup("--acls"));
+	}
 	g_ptr_array_add(args, NULL);
 
 	sproc = r_subprocess_newv(args, G_SUBPROCESS_FLAGS_STDIN_PIPE, &ierror);
