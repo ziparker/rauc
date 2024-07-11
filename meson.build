@@ -45,6 +45,7 @@ libcurldep = dependency('libcurl', version : '>=7.32.0', required : get_option('
 libnlgenldep = dependency('libnl-genl-3.0', version : '>=3.1', required : get_option('streaming'))
 threaddep = dependency('threads', required : get_option('streaming'))
 systemddep = dependency('systemd', required : false)
+libarchivedep = dependency('libarchive', version : '>=3.4.0')
 
 conf.set10('ENABLE_SERVICE', get_option('service'))
 conf.set10('ENABLE_CREATE', get_option('create'))
@@ -173,7 +174,7 @@ versiondep = declare_dependency(sources: version_h)
 
 meson.add_dist_script('version-gen', meson.project_version())
 
-rauc_deps = [threaddep, libcurldep, libnlgenldep, jsonglibdep, dbusdep, glibdep, giodep, giounixdep, openssldep, fdiskdep]
+rauc_deps = [threaddep, libcurldep, libnlgenldep, jsonglibdep, dbusdep, glibdep, giodep, giounixdep, openssldep, fdiskdep, libarchivedep]
 
 librauc = static_library('rauc',
   sources_rauc,

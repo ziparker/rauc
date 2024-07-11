@@ -1229,14 +1229,14 @@ static const gchar *suffix_to_tar_flag(const gchar *filename)
 static gboolean tar_has_xattrs(const gchar *filename)
 {
     struct archive *archive = 0;
-	gboolean have_xattr = false;
+	gboolean have_xattr = FALSE;
     struct archive_entry *entry = 0;
-	int stat = 0;
+	gint stat = 0;
 
-	g_return_val_if_fail(filename, false);
+	g_return_val_if_fail(filename, FALSE);
 
     archive = archive_read_new();
-	g_return_val_if_fail(archive, false);
+	g_return_val_if_fail(archive, FALSE);
 
     archive_read_support_filter_all(archive);
     archive_read_support_format_tar(archive);
@@ -1245,21 +1245,24 @@ static gboolean tar_has_xattrs(const gchar *filename)
 		goto out;
 	}
 
-	while (ARCHIVE_EOF != (stat = archive_read_next_header(archive, &entry)))
+	for (gint ok = TRUE; ok && ARCHIVE_EOF != (stat = archive_read_next_header(archive, &entry)); )
 	{
 		switch (stat) {
 			case ARCHIVE_FATAL:
 				g_error("%s", archive_error_string(archive));
-				break;
+				ok = FALSE;
+				continue;
 			case ARCHIVE_RETRY:
 				continue;
 			case ARCHIVE_WARN:
 				g_warning("%s", archive_error_string(archive));
 				break;
+			default:
+				break;
 		}
 
 		if (archive_entry_xattr_count(entry)) {
-			have_xattr = true;
+			have_xattr = TRUE;
 			break;
 		}
 	}
