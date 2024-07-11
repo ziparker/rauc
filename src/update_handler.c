@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <archive.h>
+#include <archive_entry.h>
+
 #include "context.h"
 #include "mount.h"
 #include "signature.h"
@@ -1223,20 +1226,74 @@ static const gchar *suffix_to_tar_flag(const gchar *filename)
 	return NULL;
 }
 
+static gboolean tar_has_xattrs(const gchar *filename)
+{
+    struct archive *archive = 0;
+	gboolean have_xattr = false;
+    struct archive_entry *entry = 0;
+	int stat = 0;
+
+	g_return_val_if_fail(filename, false);
+
+    archive = archive_read_new();
+	g_return_val_if_fail(archive, false);
+
+    archive_read_support_filter_all(archive);
+    archive_read_support_format_tar(archive);
+
+	if (ARCHIVE_OK != archive_read_open_filename(archive, filename, 4096)) {
+		goto out;
+	}
+
+	while (ARCHIVE_EOF != (stat = archive_read_next_header(archive, &entry)))
+	{
+		switch (stat) {
+			case ARCHIVE_FATAL:
+				g_error("%s", archive_error_string(archive));
+				break;
+			case ARCHIVE_RETRY:
+				continue;
+			case ARCHIVE_WARN:
+				g_warning("%s", archive_error_string(archive));
+				break;
+		}
+
+		if (archive_entry_xattr_count(entry)) {
+			have_xattr = true;
+			break;
+		}
+	}
+
+out:
+	archive_read_close(archive);
+	archive_read_free(archive);
+
+	return have_xattr;
+}
+
 static gboolean untar_image(RaucImage *image, gchar *dest, GError **error)
 {
+	const gboolean have_xattr = tar_has_xattrs(image->filename);
+
 	g_autoptr(GSubprocess) sproc = NULL;
 	GError *ierror = NULL;
 	gboolean res = FALSE;
 	g_autoptr(GPtrArray) args = g_ptr_array_new_full(5, g_free);
 
-	g_ptr_array_add(args, g_strdup("tar"));
+	if (have_xattr) {
+		g_message("detected xattrs in tarball '%s' - using bsdtar to preserve them upon extraction."
+			, image->filename);
+	}
+
+	g_ptr_array_add(args, g_strdup(have_xattr ? "bsdtar" : "tar"));
 	g_ptr_array_add(args, g_strdup("xf"));
 	g_ptr_array_add(args, g_strdup("-"));
 	g_ptr_array_add(args, g_strdup("-C"));
 	g_ptr_array_add(args, g_strdup(dest));
 	g_ptr_array_add(args, g_strdup("--numeric-owner"));
 	g_ptr_array_add(args, g_strdup(suffix_to_tar_flag(image->filename)));
+	if (have_xattr)
+		g_ptr_array_add(args, g_strdup("--xattrs"));
 	g_ptr_array_add(args, NULL);
 
 	sproc = r_subprocess_newv(args, G_SUBPROCESS_FLAGS_STDIN_PIPE, &ierror);
