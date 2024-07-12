@@ -1284,11 +1284,11 @@ static gboolean untar_image(RaucImage *image, gchar *dest, GError **error)
 	g_autoptr(GPtrArray) args = g_ptr_array_new_full(5, g_free);
 
 	if (have_xattr) {
-		g_message("detected xattrs in tarball '%s' - using bsdtar to preserve them upon extraction."
+		g_message("detected xattrs in tarball '%s' - using tar xattrs flags to preserve them upon extraction."
 			, image->filename);
 	}
 
-	g_ptr_array_add(args, g_strdup("tar"));
+	g_ptr_array_add(args, g_strdup(have_xattr ? "bsdtar" : "tar"));
 	g_ptr_array_add(args, g_strdup("xf"));
 	g_ptr_array_add(args, g_strdup("-"));
 	g_ptr_array_add(args, g_strdup("-C"));
@@ -1300,9 +1300,15 @@ static gboolean untar_image(RaucImage *image, gchar *dest, GError **error)
 		/* on extraction, tar only extracts user.* xattrs by default, so we
 		 * need to explicitly include e.g. security attrs here.
 		 *
+		 * however, in testing this, it only works when tar is run manually for
+		 * some reason, so we're using bsdtar for now.
+		 *
 		 * see: https://bugzilla.redhat.com/show_bug.cgi?id=771927 */
-		g_ptr_array_add(args, g_strdup("--xattrs-include='*'"));
+		g_ptr_array_add(args, g_strdup("--xattrs"));
+		/* these flags are required for gnu tar. */
+		/*g_ptr_array_add(args, g_strdup("--xattrs-include='*'"));
 		g_ptr_array_add(args, g_strdup("--acls"));
+		g_ptr_array_add(args, g_strdup("--selinux"));*/
 	}
 	g_ptr_array_add(args, NULL);
 
