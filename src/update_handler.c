@@ -1289,7 +1289,7 @@ static gboolean untar_image(RaucImage *image, gchar *dest, GError **error)
 	g_autoptr(GSubprocess) sproc = NULL;
 	GError *ierror = NULL;
 	gboolean res = FALSE;
-	g_autoptr(GPtrArray) args = g_ptr_array_new_full(5, g_free);
+	g_autoptr(GPtrArray) args = g_ptr_array_new_full(10, g_free);
 	const gboolean have_xattr = tar_has_xattrs(image->filename);
 	const gboolean have_bsdtar_exe = have_bsdtar();
 
