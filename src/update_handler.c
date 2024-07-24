@@ -1274,41 +1274,53 @@ out:
 	return have_xattr;
 }
 
+static gboolean have_bsdtar(void)
+{
+	gchar *path = g_find_program_in_path("bsdtar");
+	gboolean have_it = NULL != path;
+
+	g_free(path);
+
+	return have_it;
+}
+
 static gboolean untar_image(RaucImage *image, gchar *dest, GError **error)
 {
-	const gboolean have_xattr = tar_has_xattrs(image->filename);
-
 	g_autoptr(GSubprocess) sproc = NULL;
 	GError *ierror = NULL;
 	gboolean res = FALSE;
 	g_autoptr(GPtrArray) args = g_ptr_array_new_full(5, g_free);
+	const gboolean have_xattr = tar_has_xattrs(image->filename);
+	const gboolean have_bsdtar_exe = have_bsdtar();
 
-	if (have_xattr) {
-		g_message("detected xattrs in tarball '%s' - using tar xattrs flags to preserve them upon extraction."
-			, image->filename);
-	}
-
-	g_ptr_array_add(args, g_strdup(have_xattr ? "bsdtar" : "tar"));
+	g_ptr_array_add(args, g_strdup((have_xattr && have_bsdtar_exe) ? "bsdtar" : "tar"));
 	g_ptr_array_add(args, g_strdup("xf"));
 	g_ptr_array_add(args, g_strdup("-"));
 	g_ptr_array_add(args, g_strdup("-C"));
 	g_ptr_array_add(args, g_strdup(dest));
 	g_ptr_array_add(args, g_strdup("--numeric-owner"));
 	g_ptr_array_add(args, g_strdup(suffix_to_tar_flag(image->filename)));
-	if (have_xattr)
-	{
+	if (have_xattr) {
+		g_message("detected xattrs in tarball '%s' - using tar xattrs flags to preserve them upon extraction."
+			, image->filename);
+
 		/* on extraction, tar only extracts user.* xattrs by default, so we
 		 * need to explicitly include e.g. security attrs here.
 		 *
 		 * however, in testing this, it only works when tar is run manually for
-		 * some reason, so we're using bsdtar for now.
+		 * some reason, so we're preferring bsdtar for now.
 		 *
 		 * see: https://bugzilla.redhat.com/show_bug.cgi?id=771927 */
-		g_ptr_array_add(args, g_strdup("--xattrs"));
-		/* these flags are required for gnu tar. */
-		/*g_ptr_array_add(args, g_strdup("--xattrs-include='*'"));
-		g_ptr_array_add(args, g_strdup("--acls"));
-		g_ptr_array_add(args, g_strdup("--selinux"));*/
+		if (have_bsdtar_exe) {
+			g_debug("Using 'bsdtar' for archive xattrs preservation during extraction.");
+			g_ptr_array_add(args, g_strdup("--xattrs"));
+		}
+		else {
+			/* these flags are required for gnu tar, but not supported for bsdtar. */
+			g_ptr_array_add(args, g_strdup("--xattrs-include='*'"));
+			g_ptr_array_add(args, g_strdup("--acls"));
+			g_ptr_array_add(args, g_strdup("--selinux"));
+		}
 	}
 	g_ptr_array_add(args, NULL);
 
